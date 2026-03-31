@@ -31,6 +31,12 @@ from .analysis_tools import (
     analyze_flights,
 )
 
+# Backlog filter tools
+from .backlog_filter_tools import (
+    filter_jobs,
+    reset_job_filters,
+)
+
 # Chart tools
 from .chart_tools import (
     get_historical_payload,
@@ -41,12 +47,6 @@ from .chart_tools import (
 from .filter_tools import (
     filter_flights,
     reset_filters,
-)
-
-# Backlog filter tools
-from .backlog_filter_tools import (
-    filter_jobs,
-    reset_job_filters,
 )
 
 # Recommendations tools

@@ -943,11 +943,11 @@ async def rest_get_backlog_jobs(request: Request) -> JSONResponse:
         customer_name=params.get("customer_name"),
         labor_type=params.get("labor_type"),
         final_bill_month=params.get("final_bill_month"),
-        min_selling_amount=float(params.get("min_selling_amount"))
-        if params.get("min_selling_amount")
+        min_selling_amount=float(min_sell)
+        if (min_sell := params.get("min_selling_amount"))
         else None,
-        max_selling_amount=float(params.get("max_selling_amount"))
-        if params.get("max_selling_amount")
+        max_selling_amount=float(max_sell)
+        if (max_sell := params.get("max_selling_amount"))
         else None,
         sort_by=params.get("sort_by", "sellingAmount"),
         sort_desc=params.get("sort_desc", "true").lower() == "true",

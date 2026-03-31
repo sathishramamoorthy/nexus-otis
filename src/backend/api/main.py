@@ -21,17 +21,17 @@ from pydantic import BaseModel
 import patches  # noqa: F401 - side effects only
 from agents import create_backlog_agent, create_logistics_agent  # type: ignore
 from agents.utils import (
-    # Flight MCP functions
-    get_flight_by_id_from_mcp,
-    get_flight_summary_from_mcp,
-    get_flights_from_mcp,
-    get_historical_from_mcp,
     # Backlog MCP functions
     get_backlog_customers_from_mcp,
     get_backlog_job_by_id_from_mcp,
     get_backlog_jobs_from_mcp,
     get_backlog_summary_from_mcp,
     get_backlog_utilization_from_mcp,
+    # Flight MCP functions
+    get_flight_by_id_from_mcp,
+    get_flight_summary_from_mcp,
+    get_flights_from_mcp,
+    get_historical_from_mcp,
     update_backlog_job_status_from_mcp,
 )
 from middleware import (  # type: ignore
