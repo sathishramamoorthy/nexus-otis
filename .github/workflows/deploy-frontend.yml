@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+  REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
   IMAGE_NAME: logistics-frontend
-  CONTAINER_APP_NAME: ${{ vars.AZURE_FRONTEND_CONTAINER_APP_NAME }}
-  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  CONTAINER_APP_NAME: ${{ secrets.AZURE_FRONTEND_CONTAINER_APP_NAME }}
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
 
 permissions:
   id-token: write
@@ -29,22 +29,22 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Build and push image using ACR Tasks
         uses: azure/cli@v2
         env:
           # Pass all build args via env to avoid shell interpretation issues
-          AD_CLIENT_ID: ${{ vars.NEXT_PUBLIC_AZURE_AD_CLIENT_ID }}
-          AD_TENANT_ID: ${{ vars.NEXT_PUBLIC_AZURE_AD_TENANT_ID }}
-          AUTH_ENABLED: ${{ vars.NEXT_PUBLIC_AUTH_ENABLED || 'true' }}
-          API_URL: ${{ vars.AGENT_API_BASE_URL }}
+          AD_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_AZURE_AD_CLIENT_ID }}
+          AD_TENANT_ID: ${{ secrets.NEXT_PUBLIC_AZURE_AD_TENANT_ID }}
+          AUTH_ENABLED: ${{ secrets.NEXT_PUBLIC_AUTH_ENABLED || 'true' }}
+          API_URL: ${{ secrets.AGENT_API_BASE_URL }}
           # Use instrumentation key (simple GUID) instead of full connection string
           # to avoid shell escaping issues with semicolons
           APPINSIGHTS_KEY: ${{ secrets.NEXT_PUBLIC_APPINSIGHTS_INSTRUMENTATION_KEY }}
-          APPINSIGHTS_ENDPOINT: ${{ vars.NEXT_PUBLIC_APPINSIGHTS_INGESTION_ENDPOINT }}
+          APPINSIGHTS_ENDPOINT: ${{ secrets.NEXT_PUBLIC_APPINSIGHTS_INGESTION_ENDPOINT }}
         with:
           inlineScript: |
             az acr build \
