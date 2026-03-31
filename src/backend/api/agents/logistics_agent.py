@@ -93,7 +93,7 @@ STATE_SCHEMA: dict[str, object] = {
 def _load_system_prompt() -> str:
     """Load system prompt from markdown file."""
     prompt_path = Path(__file__).parent / "prompts" / "logistics_agent.md"
-    return prompt_path.read_text().strip()
+    return prompt_path.read_text(encoding="utf-8").strip()
 
 
 def create_logistics_agent(chat_client: SupportsChatGetResponse) -> AgentFrameworkAgent:

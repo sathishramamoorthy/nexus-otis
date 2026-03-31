@@ -9,6 +9,7 @@ import { NextRequest } from "next/server";
 // API URL Configuration - uses environment variables with fallbacks
 const AGENT_API_BASE_URL = process.env.AGENT_API_BASE_URL || "http://localhost:8000";
 const LOGISTICS_AGENT_URL = process.env.AGENT_LOGISTICS_URL || `${AGENT_API_BASE_URL}/logistics`;
+const BACKLOG_AGENT_URL = process.env.AGENT_BACKLOG_URL || `${AGENT_API_BASE_URL}/backlog`;
 
 // 1. You can use any service adapter here for multi-agent support. We use
 //    the empty adapter since we're only using one agent.
@@ -25,6 +26,10 @@ function createRuntime(authHeader: string | null) {
     agents: {
       "logistics_agent": new HttpAgent({
         url: LOGISTICS_AGENT_URL,
+        headers: agentHeaders,
+      }),
+      "backlog_agent": new HttpAgent({
+        url: BACKLOG_AGENT_URL,
         headers: agentHeaders,
       }),
     }

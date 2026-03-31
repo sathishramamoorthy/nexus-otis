@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 
 import { Providers } from "@/components/Providers";
-import { AuthenticatedCopilotKit } from "@/components/AuthenticatedCopilotKit";
-import { NoAuthCopilotKit } from "@/components/NoAuthCopilotKit";
+import { AgentCopilotKitWrapper } from "@/components/AgentCopilotKitWrapper";
 import "./globals.css";
 import "@copilotkit/react-ui/styles.css";
 
@@ -14,16 +13,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Check if authentication is enabled via environment variable
-const isAuthEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
-
-function CopilotKitWrapper({ children }: { children: React.ReactNode }) {
-  if (!isAuthEnabled) {
-    return <NoAuthCopilotKit>{children}</NoAuthCopilotKit>;
-  }
-  return <AuthenticatedCopilotKit>{children}</AuthenticatedCopilotKit>;
-}
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,9 +22,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={"antialiased"}>
         <Providers>
-          <CopilotKitWrapper>
+          <AgentCopilotKitWrapper>
             {children}
-          </CopilotKitWrapper>
+          </AgentCopilotKitWrapper>
         </Providers>
       </body>
     </html>

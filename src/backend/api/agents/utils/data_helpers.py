@@ -120,3 +120,74 @@ def get_flight_by_id_or_number(identifier: str) -> dict[str, Any] | None:
 
     result = get_flight_by_id_sync(identifier)
     return result.get("flight")
+
+
+# ============================================================================
+# Backlog Data Helpers
+# ============================================================================
+
+
+def _get_all_backlog_jobs() -> list[dict[str, Any]]:
+    """
+    Get all backlog jobs from MCP server.
+
+    This is a sync function that uses the sync MCP client.
+    For async contexts, use get_all_backlog_jobs_from_mcp() from mcp_client.
+    """
+    from .mcp_client import get_all_backlog_jobs_sync
+
+    return get_all_backlog_jobs_sync()
+
+
+def _get_backlog_summary() -> dict[str, Any]:
+    """
+    Get backlog summary statistics from MCP server.
+    """
+    from .mcp_client import get_backlog_summary_sync
+
+    try:
+        return get_backlog_summary_sync()
+    except Exception as e:
+        logger.warning(f"Failed to get backlog summary from MCP: {e}")
+        return {}
+
+
+def _get_backlog_customers() -> list[dict[str, Any]]:
+    """
+    Get backlog customers consolidated view from MCP server.
+    """
+    from .mcp_client import get_backlog_customers_sync
+
+    try:
+        result = get_backlog_customers_sync()
+        return result.get("customers", [])
+    except Exception as e:
+        logger.warning(f"Failed to get backlog customers from MCP: {e}")
+        return []
+
+
+def _get_backlog_utilization(
+    week_start: str | None = None,
+    week_end: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Get backlog utilization data from MCP server.
+    """
+    from .mcp_client import get_backlog_utilization_sync
+
+    try:
+        result = get_backlog_utilization_sync(week_start=week_start, week_end=week_end)
+        return result.get("utilization", [])
+    except Exception as e:
+        logger.warning(f"Failed to get backlog utilization from MCP: {e}")
+        return []
+
+
+def get_backlog_job_by_id(job_id: str) -> dict[str, Any] | None:
+    """
+    Helper to find a backlog job by ID from MCP server.
+    """
+    from .mcp_client import get_backlog_job_by_id_sync
+
+    result = get_backlog_job_by_id_sync(job_id)
+    return result.get("job")

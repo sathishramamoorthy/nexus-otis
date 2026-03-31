@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { AuthButton } from "@/components/AuthButton";
+import { AgentSwitcher } from "@/components/AgentSwitcher";
+import { useAgent } from "@/lib/AgentContext";
 import { LogisticsAgentState, Flight, DashboardFilter, initialLogisticsState, RecommendationsResult, FeedbackPayload, DEFAULT_FILTER } from "@/lib/logisticsTypes";
+import { Job, BacklogFilter, BacklogAgentState, initialBacklogState, DEFAULT_BACKLOG_FILTER } from "@/lib/backlogTypes";
 import { useLogisticsData } from "@/lib/useLogisticsData";
+import { useBacklogData } from "@/lib/useBacklogData";
 import { useSafeAccessToken } from "@/lib/useSafeAccessToken";
 import { useCoAgent, useCopilotAction, useCoAgentStateRender, useRenderToolCall, useCopilotChat, useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotChat, UserMessageProps } from "@copilotkit/react-ui";
@@ -11,6 +15,8 @@ import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import { FlightListCard } from "@/components/FlightListCard";
 import { FlightDetailCard } from "@/components/FlightDetailCard";
 import { HistoricalChart } from "@/components/HistoricalChart";
+import { JobListCard } from "@/components/JobListCard";
+import { JobDetailCard, JobStatusUpdate } from "@/components/JobDetailCard";
 // useNewChat is exported from NoAuthCopilotKit for "New Chat" functionality
 
 // Prefix for system action messages - these are hidden from the chat UI but sent to the LLM
@@ -49,6 +55,9 @@ function CustomUserMessage({ message }: UserMessageProps) {
 
 export default function LogisticsPage() {
   const [themeColor, setThemeColor] = useState("#1e3a5f"); // Dark navy blue for logistics
+
+  // Get the current agent for dynamic UI
+  const { agent } = useAgent();
 
   // Get access token for authenticated API calls (returns null when auth is disabled)
   const accessToken = useSafeAccessToken();
@@ -109,12 +118,13 @@ export default function LogisticsPage() {
               <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
               <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
-            <span className="text-xl font-bold text-white">Logistics Explorer</span>
+            <span className="text-xl font-bold text-white">Backlog Explorer</span>
           </div>
           <a href="#" className="text-gray-300 hover:text-white transition-colors">Docs</a>
           <a href="#" className="text-gray-300 hover:text-white transition-colors">About</a>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-4">
+          <AgentSwitcher />
           <AuthButton />
         </div>
       </nav>
@@ -123,18 +133,22 @@ export default function LogisticsPage() {
       <div className="flex justify-center items-center px-4 md:px-12 py-4 md:py-6" style={{ height: 'calc(100vh - 4rem)' }}>
         <div className="w-full max-w-7xl h-full flex flex-col lg:flex-row gap-4 md:gap-6">
           {/* Dashboard panel - 70% on large screens, full width on smaller */}
-          <LogisticsDashboard themeColor={themeColor} />
+          {agent === "logistics_agent" ? (
+            <LogisticsDashboard themeColor={themeColor} />
+          ) : (
+            <BacklogDashboard themeColor={themeColor} />
+          )}
 
           {/* Chat panel - 30% on large screens, full width on smaller */}
           <div className="w-full lg:w-[30%] h-[40vh] lg:h-full border border-gray-700 rounded-xl shadow-lg overflow-hidden flex-shrink-0">
             <CopilotChat
               className="h-full"
               labels={{
-                title: "Logistics Assistant",
-                initial: getInitialGreeting()
+                title: agent === "logistics_agent" ? "Logistics Assistant" : "Backlog Assistant",
+                initial: agent === "logistics_agent" ? getInitialGreeting() : "Hi! I can help you analyze workable backlog data. Ask me about jobs, customers, or filter by various criteria."
               }}
               UserMessage={CustomUserMessage}
-              suggestions={[
+              suggestions={agent === "logistics_agent" ? [
                 {
                   title: "Over-utilized Flights",
                   message: "Show me top 10 over-utilized flights for the next sort time",
@@ -162,6 +176,31 @@ export default function LogisticsPage() {
                 {
                   title: "Historical Data",
                   message: "Show me historical payload trends for the last 7 days",
+                }
+              ] : [
+                {
+                  title: "Ready Jobs",
+                  message: "Show me all jobs that are ready to work",
+                },
+                {
+                  title: "High Value Jobs",
+                  message: "Show me jobs with selling amount over $50,000",
+                },
+                {
+                  title: "Labor Types",
+                  message: "Show me the breakdown of jobs by labor type",
+                },
+                {
+                  title: "Customer Analysis",
+                  message: "Which customers have the most backlog jobs?",
+                },
+                {
+                  title: "Billing Summary",
+                  message: "Show me jobs by final bill month",
+                },
+                {
+                  title: "Job Types",
+                  message: "What are the different job types and their counts?",
                 }
               ]}
             />
@@ -1206,6 +1245,544 @@ function LogisticsDashboard({ themeColor }: { themeColor: string }) {
                   <p className="text-gray-400 max-w-md">
                     Use the chat assistant to query flight data, view utilization risks, 
                     and explore historical payload trends.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BacklogDashboard({ themeColor }: { themeColor: string }) {
+  // Get access token for authenticated API calls (returns null when auth is disabled)
+  const accessToken = useSafeAccessToken();
+
+  // Local state for UI controls
+  const [highlightReady, setHighlightReady] = useState(true);
+  const [isFetchingData, setIsFetchingData] = useState(false);
+  const [maxJobs, setMaxJobs] = useState(10);
+
+  // 🪁 REST Data Fetching: Load initial data from REST API
+  const { 
+    jobs: initialJobs, 
+    summary,
+    isLoading,
+    error,
+    refetchJobs,
+  } = useBacklogData(100, accessToken);
+
+  // Local display state
+  const [displayJobs, setDisplayJobs] = useState<Job[]>([]);
+  const [displayFilter, setDisplayFilter] = useState<BacklogFilter>(DEFAULT_BACKLOG_FILTER);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  // Sync initial data to display state
+  useEffect(() => {
+    if (initialJobs.length > 0 && displayJobs.length === 0) {
+      console.log('[BacklogDashboard] Setting initial display jobs:', initialJobs.length);
+      setDisplayJobs(initialJobs);
+    }
+  }, [initialJobs, displayJobs.length]);
+
+  // 🪁 Shared State: https://docs.copilotkit.ai/microsoft-agent-framework/shared-state
+  const { setState } = useCoAgent<BacklogAgentState>({
+    name: "backlog_agent",
+    initialState: initialBacklogState,
+  });
+
+  useCoAgentStateRender<BacklogAgentState>({
+    name: "backlog_agent",
+    render: ({ state: agentState }) => {
+      if (agentState?.activeFilter && isFetchingData) {
+        const filter = agentState.activeFilter;
+        const parts: string[] = [];
+        if (filter.customerName) parts.push(filter.customerName);
+        if (filter.jobType) parts.push(filter.jobType);
+        if (filter.laborType) parts.push(filter.laborType);
+        
+        return (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-1">
+            <div className="w-3 h-3 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+            <span>Loading {parts.join(' ') || 'jobs'}...</span>
+          </div>
+        );
+      }
+      return null;
+    },
+  });
+
+  // 🪁 Tell the LLM what's currently displayed
+  useCopilotReadable({
+    description: "Current backlog dashboard state - ALWAYS pass activeFilter fields to analyze_backlog.",
+    value: {
+      displayedJobCount: displayJobs.length,
+      activeFilter: {
+        filterType: displayFilter.filterType,
+        customerName: displayFilter.customerName || null,
+        jobType: displayFilter.jobType || null,
+        laborType: displayFilter.laborType || null,
+        readyToWork: displayFilter.readyToWork ?? null,
+        finalBillMonth: displayFilter.finalBillMonth || null,
+      },
+      filterDescription: displayFilter.filterType === 'all'
+        ? `Showing all ${displayJobs.length} jobs (filterType="all")`
+        : `Filtered (${displayFilter.filterType}): ${[
+            displayFilter.customerName && `customer: ${displayFilter.customerName}`,
+            displayFilter.jobType && `type: ${displayFilter.jobType}`,
+            displayFilter.laborType && `labor: ${displayFilter.laborType}`,
+            displayFilter.readyToWork !== undefined && displayFilter.readyToWork !== null && `ready: ${displayFilter.readyToWork}`,
+            displayFilter.finalBillMonth && `bill month: ${displayFilter.finalBillMonth}`,
+          ].filter(Boolean).join(', ')}`,
+    },
+  });
+
+  // 🔑 Track processed tool calls to prevent re-fetching on re-renders
+  const processedToolCalls = useRef<Set<string>>(new Set());
+
+  // 🪁 Render Backend Tool Calls: filter_jobs
+  useRenderToolCall({
+    name: "filter_jobs",
+    render: ({ args, status }) => {
+      const filter = args as Record<string, unknown>;
+      const parts: string[] = [];
+      if (filter?.customer_name) parts.push(filter.customer_name as string);
+      if (filter?.job_type) parts.push(filter.job_type as string);
+      if (filter?.labor_type) parts.push(filter.labor_type as string);
+      if (filter?.ready_to_work !== undefined) parts.push(filter.ready_to_work ? 'ready' : 'not ready');
+      const filterDesc = parts.length > 0 ? parts.join(', ') : 'current filters';
+      
+      if (status === 'complete') {
+        const callKey = `filter_jobs:${JSON.stringify(args)}`;
+        if (!processedToolCalls.current.has(callKey)) {
+          processedToolCalls.current.add(callKey);
+          
+          const mergedFilter: BacklogFilter = {
+            ...displayFilter,
+            customerName: filter?.customer_name ? (filter.customer_name as string) : displayFilter.customerName,
+            jobType: filter?.job_type ? (filter.job_type as BacklogFilter['jobType']) : displayFilter.jobType,
+            laborType: filter?.labor_type ? (filter.labor_type as BacklogFilter['laborType']) : displayFilter.laborType,
+            readyToWork: filter?.ready_to_work !== undefined ? (filter.ready_to_work as boolean) : displayFilter.readyToWork,
+            finalBillMonth: filter?.final_bill_month ? (filter.final_bill_month as string) : displayFilter.finalBillMonth,
+            minSellingAmount: filter?.min_selling_amount !== undefined ? (filter.min_selling_amount as number) : displayFilter.minSellingAmount,
+            maxSellingAmount: filter?.max_selling_amount !== undefined ? (filter.max_selling_amount as number) : displayFilter.maxSellingAmount,
+            limit: (filter?.limit as number) || displayFilter.limit || 100,
+          };
+          
+          // Determine filterType
+          const hasCustomer = !!mergedFilter.customerName;
+          const hasJobType = !!mergedFilter.jobType;
+          const hasLaborType = !!mergedFilter.laborType;
+          const hasReadiness = mergedFilter.readyToWork !== undefined && mergedFilter.readyToWork !== null;
+          const hasBilling = !!mergedFilter.finalBillMonth;
+          
+          if ((hasCustomer && hasJobType) || (hasCustomer && hasLaborType) || (hasJobType && hasLaborType)) {
+            mergedFilter.filterType = 'combined';
+          } else if (hasCustomer) mergedFilter.filterType = 'customer';
+          else if (hasJobType) mergedFilter.filterType = 'jobType';
+          else if (hasLaborType) mergedFilter.filterType = 'laborType';
+          else if (hasReadiness) mergedFilter.filterType = 'readiness';
+          else if (hasBilling) mergedFilter.filterType = 'billing';
+          else mergedFilter.filterType = 'all';
+          
+          setTimeout(() => {
+            console.log('[filter_jobs] Merged filter:', mergedFilter);
+            setDisplayFilter(mergedFilter);
+            setIsFetchingData(true);
+            
+            refetchJobs({
+              limit: mergedFilter.limit || 100,
+              customerName: mergedFilter.customerName || undefined,
+              jobType: mergedFilter.jobType || undefined,
+              laborType: mergedFilter.laborType || undefined,
+              readyToWork: mergedFilter.readyToWork ?? undefined,
+              finalBillMonth: mergedFilter.finalBillMonth || undefined,
+              minSellingAmount: mergedFilter.minSellingAmount ?? undefined,
+              maxSellingAmount: mergedFilter.maxSellingAmount ?? undefined,
+            }).then((jobs) => {
+              console.log('[filter_jobs] Fetched', jobs.length, 'jobs');
+              setDisplayJobs(jobs);
+              setIsFetchingData(false);
+            }).catch((err) => {
+              console.error('[filter_jobs] Fetch error:', err);
+              setIsFetchingData(false);
+            });
+          }, 0);
+        }
+      }
+      
+      return (
+        <div className="flex items-center gap-2 text-sm p-2 my-1 rounded-lg bg-green-500/10 border border-green-500/20">
+          {status !== 'complete' ? (
+            <>
+              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-green-300">Adding filter: {filterDesc}...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-green-400">🔍</span>
+              <span className="text-green-300">Loaded {filterDesc}</span>
+            </>
+          )}
+        </div>
+      );
+    },
+  });
+
+  // analyze_backlog - answers questions about displayed data
+  useRenderToolCall({
+    name: "analyze_backlog",
+    render: ({ args, status, result }) => {
+      const params = args as Record<string, unknown>;
+      const question = (params?.question as string) || 'backlog data';
+      
+      let analysisResult: Record<string, unknown> | null = null;
+      if (status === 'complete' && result) {
+        try {
+          analysisResult = typeof result === 'string' ? JSON.parse(result) : result;
+        } catch {
+          // Result might not be JSON
+        }
+      }
+      
+      return (
+        <div className="flex flex-col gap-2 text-sm p-2 my-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          {status !== 'complete' ? (
+            <div className="flex items-start gap-2">
+              <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mt-0.5" />
+              <span className="text-purple-300">Analyzing: {question}...</span>
+            </div>
+          ) : analysisResult ? (
+            <>
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400">📊</span>
+                <span className="text-purple-300 font-medium">
+                  {String(analysisResult.job_count || analysisResult.total_jobs || 0)} jobs analyzed
+                </span>
+              </div>
+              {analysisResult.total_backlog_amount && (
+                <div className="text-purple-200 text-xs ml-6">
+                  Total backlog: ${Number(analysisResult.total_backlog_amount).toLocaleString()}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">📊</span>
+              <span className="text-purple-300">Analysis complete</span>
+            </div>
+          )}
+        </div>
+      );
+    },
+  });
+
+  // reset_job_filters - removes all filters
+  useRenderToolCall({
+    name: "reset_job_filters",
+    render: ({ status }) => {
+      if (status === 'complete') {
+        if (!processedToolCalls.current.has('reset_job_filters:done')) {
+          processedToolCalls.current.add('reset_job_filters:done');
+          
+          setTimeout(() => {
+            console.log('[reset_job_filters] Processing reset');
+            setDisplayFilter(DEFAULT_BACKLOG_FILTER);
+            setSelectedJob(null);
+            setIsFetchingData(true);
+            
+            refetchJobs({ limit: 100 }).then((jobs) => {
+              console.log('[reset_job_filters] Fetched', jobs.length, 'jobs');
+              setDisplayJobs(jobs);
+              setIsFetchingData(false);
+            }).catch((err) => {
+              console.error('[reset_job_filters] Fetch error:', err);
+              setIsFetchingData(false);
+            });
+          }, 0);
+        }
+      } else if (status === 'inProgress' || status === 'executing') {
+        processedToolCalls.current.delete('reset_job_filters:done');
+      }
+      
+      return (
+        <div className="flex items-center gap-2 text-sm p-2 my-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
+          {status !== 'complete' ? (
+            <>
+              <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-orange-300">Clearing filters...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-orange-400">🔄</span>
+              <span className="text-orange-300">Filters cleared</span>
+            </>
+          )}
+        </div>
+      );
+    },
+  });
+
+  // Handle job selection
+  const handleSelectJob = (job: Job) => {
+    setSelectedJob(job);
+    setState(prev => ({
+      ...prev,
+      selectedJob: job,
+    }));
+  };
+
+  // Handle status toggle changes - update backend and refresh data
+  const handleStatusChange = async (update: JobStatusUpdate) => {
+    console.log('[BacklogDashboard] Status change:', update);
+    
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/logistics/data/backlog/${update.jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          [update.field]: update.value,
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('[BacklogDashboard] Failed to update job status:', response.statusText);
+        return;
+      }
+      
+      const result = await response.json();
+      console.log('[BacklogDashboard] Job status updated:', result);
+      
+      // Update the job in displayJobs to reflect the change
+      if (result.job) {
+        setDisplayJobs(prev => prev.map(j => 
+          j.jobId === update.jobId ? { ...j, ...result.job } : j
+        ));
+        
+        // Also update selectedJob if it's the same job
+        if (selectedJob?.jobId === update.jobId) {
+          setSelectedJob({ ...selectedJob, ...result.job });
+        }
+      }
+    } catch (err) {
+      console.error('[BacklogDashboard] Error updating job status:', err);
+    }
+  };
+
+  // Handle closing detail view
+  const handleCloseDetail = () => {
+    setSelectedJob(null);
+    setState(prev => ({
+      ...prev,
+      selectedJob: null,
+    }));
+  };
+
+  return (
+    <div
+      style={{ backgroundColor: `${themeColor}15` }}
+      className="w-full lg:w-[70%] min-h-[55vh] lg:h-full rounded-xl shadow-lg overflow-auto p-4 md:p-6 transition-colors duration-300 border border-gray-700 flex flex-col"
+    >
+      <div className="flex flex-col gap-4 md:gap-6 flex-1 min-h-0">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+              📋 Workable Backlog Dashboard
+            </h1>
+            <p className="text-gray-400 text-xs md:text-sm mt-1">
+              Job tracking, customer analysis, and billing overview
+            </p>
+          </div>
+          <div className="flex items-center gap-3 md:gap-4 flex-wrap">
+            <label className="flex items-center gap-2 text-xs md:text-sm text-gray-300">
+              <span>Show</span>
+              <select
+                value={maxJobs}
+                onChange={(e) => setMaxJobs(Number(e.target.value))}
+                className="bg-gray-700 border border-gray-600 text-white text-xs md:text-sm rounded px-2 py-1 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+              </select>
+              <span>jobs</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs md:text-sm text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={highlightReady}
+                onChange={(e) => setHighlightReady(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+              />
+              Highlight Ready
+            </label>
+          </div>
+        </div>
+
+        {/* Summary Cards - reflects filtered data */}
+        {(() => {
+          // Compute metrics from displayed (filtered) jobs
+          const totalJobs = displayJobs.length;
+          const totalBacklog = displayJobs.reduce((sum, job) => sum + (job.workableBacklogAmount || 0), 0);
+          const readyCount = displayJobs.filter(job => job.readyToWork).length;
+          const totalMargin = displayJobs.reduce((sum, job) => sum + (job.projectedMargin || 0), 0);
+          const isFiltered = displayFilter.filterType !== 'all';
+          
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400">
+                  {isFiltered ? 'Filtered Jobs' : 'Total Jobs'}
+                </div>
+                <div className="text-xl font-bold text-white">{totalJobs}</div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400">Backlog Amount</div>
+                <div className="text-xl font-bold text-white">
+                  {totalBacklog >= 1000000 
+                    ? `$${(totalBacklog / 1000000).toFixed(1)}M`
+                    : `$${(totalBacklog / 1000).toFixed(0)}K`}
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400">Ready to Work</div>
+                <div className="text-xl font-bold text-green-400">{readyCount}</div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400">Projected Margin</div>
+                <div className="text-xl font-bold text-white">
+                  {totalMargin >= 1000000 
+                    ? `$${(totalMargin / 1000000).toFixed(1)}M`
+                    : `$${(totalMargin / 1000).toFixed(0)}K`}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Active Filter Indicator */}
+        {displayFilter.filterType !== 'all' && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-lg flex-wrap">
+            <span className="text-green-300 text-sm">🔍 Active Filter:</span>
+            {displayFilter.customerName && (
+              <span className="px-2 py-0.5 bg-green-700/50 rounded text-white text-sm">
+                Customer: {displayFilter.customerName}
+              </span>
+            )}
+            {displayFilter.jobType && (
+              <span className="px-2 py-0.5 bg-blue-700/50 rounded text-white text-sm">
+                Type: {displayFilter.jobType}
+              </span>
+            )}
+            {displayFilter.laborType && (
+              <span className="px-2 py-0.5 bg-purple-700/50 rounded text-white text-sm">
+                Labor: {displayFilter.laborType}
+              </span>
+            )}
+            {displayFilter.readyToWork !== undefined && displayFilter.readyToWork !== null && (
+              <span className={`px-2 py-0.5 rounded text-white text-sm ${
+                displayFilter.readyToWork ? 'bg-green-700/50' : 'bg-orange-700/50'
+              }`}>
+                {displayFilter.readyToWork ? 'Ready to Work' : 'Not Ready'}
+              </span>
+            )}
+            {displayFilter.finalBillMonth && (
+              <span className="px-2 py-0.5 bg-cyan-700/50 rounded text-white text-sm">
+                Bill Month: {displayFilter.finalBillMonth}
+              </span>
+            )}
+            <button
+              onClick={async () => {
+                console.log('[Clear Button] Clicked - resetting backlog filters');
+                setDisplayFilter(DEFAULT_BACKLOG_FILTER);
+                setSelectedJob(null);
+                setIsFetchingData(true);
+                
+                try {
+                  const jobs = await refetchJobs({ limit: 100 });
+                  console.log('[Clear Button] Fetched', jobs.length, 'jobs');
+                  setDisplayJobs(jobs);
+                } catch (err) {
+                  console.error('[Clear Button] Fetch error:', err);
+                } finally {
+                  setIsFetchingData(false);
+                }
+              }}
+              className="ml-2 text-gray-400 hover:text-white text-sm"
+            >
+              ✕ Clear
+            </button>
+          </div>
+        )}
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col gap-6 min-h-0 relative">
+          {isFetchingData && displayJobs.length > 0 && !selectedJob && (
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-3 border-green-400 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-gray-300">Loading jobs...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Job List */}
+          {!selectedJob && (
+            <JobListCard
+              key={`jobs-${displayJobs.length}-${displayJobs[0]?.jobId ?? 'empty'}`}
+              jobs={displayJobs}
+              selectedJobId={selectedJob?.jobId}
+              onSelectJob={handleSelectJob}
+              highlightReady={highlightReady}
+              pageSize={maxJobs}
+              minItems={5}
+            />
+          )}
+
+          {/* Selected Job Detail */}
+          {selectedJob && (
+            <JobDetailCard
+              job={selectedJob}
+              themeColor={themeColor}
+              onClose={handleCloseDetail}
+              onStatusChange={handleStatusChange}
+            />
+          )}
+        </div>
+
+        {/* Empty state */}
+        {(!displayJobs || displayJobs.length === 0) && !selectedJob && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              {isLoading ? (
+                <>
+                  <div className="text-6xl mb-4 animate-pulse">📋</div>
+                  <h2 className="text-xl font-semibold text-white mb-2">Loading Data...</h2>
+                  <p className="text-gray-400 max-w-md">
+                    Fetching backlog data from the server.
+                  </p>
+                </>
+              ) : error ? (
+                <>
+                  <div className="text-6xl mb-4">⚠️</div>
+                  <h2 className="text-xl font-semibold text-red-400 mb-2">Error Loading Data</h2>
+                  <p className="text-gray-400 max-w-md">{error}</p>
+                </>
+              ) : (
+                <>
+                  <div className="text-6xl mb-4">📋</div>
+                  <h2 className="text-xl font-semibold text-white mb-2">Ready to Analyze</h2>
+                  <p className="text-gray-400 max-w-md">
+                    Use the chat assistant to query backlog data, filter by customer,
+                    and analyze job types.
                   </p>
                 </>
               )}

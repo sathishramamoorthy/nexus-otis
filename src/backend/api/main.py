@@ -19,12 +19,20 @@ from pydantic import BaseModel
 # See patches.py for details on the issues being fixed.
 # ============================================================================
 import patches  # noqa: F401 - side effects only
-from agents import create_logistics_agent  # type: ignore
+from agents import create_backlog_agent, create_logistics_agent  # type: ignore
 from agents.utils import (
+    # Flight MCP functions
     get_flight_by_id_from_mcp,
     get_flight_summary_from_mcp,
     get_flights_from_mcp,
     get_historical_from_mcp,
+    # Backlog MCP functions
+    get_backlog_customers_from_mcp,
+    get_backlog_job_by_id_from_mcp,
+    get_backlog_jobs_from_mcp,
+    get_backlog_summary_from_mcp,
+    get_backlog_utilization_from_mcp,
+    update_backlog_job_status_from_mcp,
 )
 from middleware import (  # type: ignore
     AzureADAuthMiddleware,
@@ -67,6 +75,7 @@ configure_observability()
 # These will be initialized in the lifespan handler
 chat_client: SupportsChatGetResponse | None = None
 logistics_agent: AgentFrameworkAgent | None = None
+backlog_agent: AgentFrameworkAgent | None = None
 
 
 async def _init_chat_client():
@@ -74,7 +83,7 @@ async def _init_chat_client():
 
     This is called during application startup.
     """
-    global chat_client, logistics_agent
+    global chat_client, logistics_agent, backlog_agent
 
     # Build the Responses API client
     from clients import build_responses_client  # type: ignore
@@ -82,6 +91,7 @@ async def _init_chat_client():
     chat_client = build_responses_client()
 
     logistics_agent = create_logistics_agent(chat_client)
+    backlog_agent = create_backlog_agent(chat_client)
 
 
 @asynccontextmanager
@@ -90,7 +100,7 @@ async def lifespan(_app: FastAPI):
     Application lifespan handler.
     Initializes the chat client and loads Azure AD OpenID configuration.
     """
-    global logistics_agent
+    global logistics_agent, backlog_agent
 
     # Initialize chat client and agent
     await _init_chat_client()
@@ -103,6 +113,14 @@ async def lifespan(_app: FastAPI):
         path="/logistics",
     )
     logger.info("Registered AG-UI endpoint at /logistics")
+
+    # Register backlog agent endpoint
+    add_agent_framework_fastapi_endpoint(
+        app=_app,
+        agent=backlog_agent,  # pyright: ignore[reportArgumentType]
+        path="/backlog",
+    )
+    logger.info("Registered AG-UI endpoint at /backlog")
 
     # Log observability status
     if is_observability_enabled():
@@ -201,6 +219,7 @@ async def create_conversation():
     service_session_id to AgentSession, and the Responses API uses it as
     the conversation parameter for server-side history management.
     """
+    logger.warning("Creating new Azure Foundry conversation...")
     if chat_client is None:
         raise ValueError("Chat client not initialized")
 
@@ -378,6 +397,114 @@ async def get_data_summary():
     Proxies to the MCP server's /api/summary endpoint.
     """
     return await get_flight_summary_from_mcp()
+
+
+# ============================================================================
+# Backlog REST Endpoints (Proxy to MCP Server)
+# ============================================================================
+
+
+@app.get("/logistics/data/backlog")
+async def get_backlog_jobs(
+    limit: int = Query(100, ge=1, le=200, description="Maximum number of jobs to return"),
+    offset: int = Query(0, ge=0, description="Number of jobs to skip"),
+    job_type: str | None = Query(None, description="Filter by job type: Fixed Price, T&M"),
+    ready_to_work: bool | None = Query(None, description="Filter by ready to work status"),
+    customer_name: str | None = Query(None, description="Filter by customer name (partial match)"),
+    labor_type: str | None = Query(None, description="Filter by labor type: Crew, Single Mechanic"),
+    final_bill_month: str | None = Query(
+        None, description="Filter by final billing month: Mar, Apr, May, Jun, Jul"
+    ),
+    min_selling_amount: float | None = Query(None, description="Filter by minimum selling amount"),
+    max_selling_amount: float | None = Query(None, description="Filter by maximum selling amount"),
+    sort_by: str | None = Query("sellingAmount", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
+):
+    """
+    REST endpoint for backlog jobs retrieval.
+    Proxies to the MCP server's /api/backlog endpoint.
+    """
+    return await get_backlog_jobs_from_mcp(
+        limit=limit,
+        offset=offset,
+        job_type=job_type,
+        ready_to_work=ready_to_work,
+        customer_name=customer_name,
+        labor_type=labor_type,
+        final_bill_month=final_bill_month,
+        min_selling_amount=min_selling_amount,
+        max_selling_amount=max_selling_amount,
+        sort_by=sort_by or "sellingAmount",
+        sort_desc=sort_desc,
+    )
+
+
+@app.get("/logistics/data/backlog/{job_id}")
+async def get_backlog_job_by_id_endpoint(job_id: str):
+    """
+    Get a specific backlog job by ID.
+    Proxies to the MCP server's /api/backlog/{job_id} endpoint.
+    """
+    return await get_backlog_job_by_id_from_mcp(job_id)
+
+
+class JobStatusUpdatePayload(BaseModel):
+    """Payload for updating job status fields."""
+
+    downPaymentReceived: bool | None = None
+    permitReceived: bool | None = None
+    materialOrdered: bool | None = None
+    materialOnHand: bool | None = None
+    customerDelay: bool | None = None
+
+
+@app.patch("/logistics/data/backlog/{job_id}")
+async def update_backlog_job_status_endpoint(job_id: str, payload: JobStatusUpdatePayload):
+    """
+    Update a backlog job's status fields.
+    Proxies to the MCP server's PATCH /api/backlog/{job_id} endpoint.
+    """
+    return await update_backlog_job_status_from_mcp(
+        job_id=job_id,
+        down_payment_received=payload.downPaymentReceived,
+        permit_received=payload.permitReceived,
+        material_ordered=payload.materialOrdered,
+        material_on_hand=payload.materialOnHand,
+        customer_delay=payload.customerDelay,
+    )
+
+
+@app.get("/logistics/data/backlog-summary")
+async def get_backlog_summary():
+    """
+    Get backlog summary statistics.
+    Proxies to the MCP server's /api/backlog-summary endpoint.
+    """
+    return await get_backlog_summary_from_mcp()
+
+
+@app.get("/logistics/data/backlog-customers")
+async def get_backlog_customers():
+    """
+    Get backlog customers consolidated view.
+    Proxies to the MCP server's /api/backlog-customers endpoint.
+    """
+    return await get_backlog_customers_from_mcp()
+
+
+@app.get("/logistics/data/backlog-utilization")
+async def get_backlog_utilization(
+    week_start: str | None = Query(None, description="Filter by week start date (YYYY-MM-DD)"),
+    week_end: str | None = Query(None, description="Filter by week end date (YYYY-MM-DD)"),
+):
+    """
+    Get backlog resource utilization data.
+    Proxies to the MCP server's /api/backlog-utilization endpoint.
+    """
+    return await get_backlog_utilization_from_mcp(
+        week_start=week_start,
+        week_end=week_end,
+    )
 
 
 # ============================================================================

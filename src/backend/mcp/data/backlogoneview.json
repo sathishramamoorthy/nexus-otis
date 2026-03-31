@@ -1,0 +1,384 @@
+[
+  {
+    "customerId": "CUST1001",
+    "customerName": "Borgata Hotel and Casino",
+    "primaryAddress": "One Borgata Way, Atlantic City, NJ",
+    "totalJobs": 4,
+    "activeJobs": 4,
+    "totalContractValue": 611889.0,
+    "workableBacklog": 585301.0,
+    "jobs": [
+      "NPA15910",
+      "NPA15923",
+      "NPA15924",
+      "NPA15939"
+    ]
+  },
+  {
+    "customerId": "CUST1002",
+    "customerName": "United Methodist Communities",
+    "primaryAddress": "2201 Route 9, Ocean City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 80350.0,
+    "workableBacklog": 80350.0,
+    "jobs": [
+      "NPA15911"
+    ]
+  },
+  {
+    "customerId": "CUST1003",
+    "customerName": "City of Atlantic City",
+    "primaryAddress": "1300 Atlantic Ave, Atlantic City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 43180.0,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15912"
+    ]
+  },
+  {
+    "customerId": "CUST1004",
+    "customerName": "Ocean 21 Condo",
+    "primaryAddress": "116 W 21st Ave, North Wildwood, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 8610.0,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15913"
+    ]
+  },
+  {
+    "customerId": "CUST1005",
+    "customerName": "St Christophers Hospital",
+    "primaryAddress": "160 E Erie Ave, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 76000.0,
+    "workableBacklog": 76000.0,
+    "jobs": [
+      "NPA15914"
+    ]
+  },
+  {
+    "customerId": "CUST1006",
+    "customerName": "211 South Broad",
+    "primaryAddress": "211 S Broad St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 10160.0,
+    "workableBacklog": 10160.0,
+    "jobs": [
+      "NPA15915"
+    ]
+  },
+  {
+    "customerId": "CUST1007",
+    "customerName": "Intech Construction",
+    "primaryAddress": "2929 Arch St, Philadelphia, PA",
+    "totalJobs": 2,
+    "activeJobs": 2,
+    "totalContractValue": 481238.0,
+    "workableBacklog": 481238.0,
+    "jobs": [
+      "NPA15916",
+      "NPA15943"
+    ]
+  },
+  {
+    "customerId": "CUST1008",
+    "customerName": "The Philadelphia Building",
+    "primaryAddress": "131 S Broad St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 72124.0,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15917"
+    ]
+  },
+  {
+    "customerId": "CUST1009",
+    "customerName": "Ace Veith",
+    "primaryAddress": "113652 Market St, Philadelphia, PA",
+    "totalJobs": 2,
+    "activeJobs": 2,
+    "totalContractValue": 4211.8,
+    "workableBacklog": 4211.8,
+    "jobs": [
+      "NPA15918",
+      "NPA15940"
+    ]
+  },
+  {
+    "customerId": "CUST1010",
+    "customerName": "Chris Miller Properties",
+    "primaryAddress": "646302 Walnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 224310.36,
+    "workableBacklog": 224310.36,
+    "jobs": [
+      "NPA15919"
+    ]
+  },
+  {
+    "customerId": "CUST1011",
+    "customerName": "Denise Jackson",
+    "primaryAddress": "612251 Chestnut St, Philadelphia, PA",
+    "totalJobs": 2,
+    "activeJobs": 2,
+    "totalContractValue": 5870.42,
+    "workableBacklog": 2935.21,
+    "jobs": [
+      "NPA15920",
+      "NPA15946"
+    ]
+  },
+  {
+    "customerId": "CUST1012",
+    "customerName": "Golden Nugget Atlantic City",
+    "primaryAddress": "600 Huron Ave, Atlantic City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 31500.0,
+    "workableBacklog": 31500.0,
+    "jobs": [
+      "NPA15921"
+    ]
+  },
+  {
+    "customerId": "CUST1013",
+    "customerName": "TJ University Hospital",
+    "primaryAddress": "18 Laurel Rd, Stratford, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 124909.28,
+    "workableBacklog": 124909.28,
+    "jobs": [
+      "NPA15922"
+    ]
+  },
+  {
+    "customerId": "CUST1014",
+    "customerName": "City of Philadelphia",
+    "primaryAddress": "1515 Arch St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 3095.68,
+    "workableBacklog": 3095.68,
+    "jobs": [
+      "NPA15925"
+    ]
+  },
+  {
+    "customerId": "CUST1015",
+    "customerName": "Market Street Properties",
+    "primaryAddress": "1919 Market St, Philadelphia, PA",
+    "totalJobs": 2,
+    "activeJobs": 2,
+    "totalContractValue": 383874.0,
+    "workableBacklog": 383874.0,
+    "jobs": [
+      "NPA15926",
+      "NPA15927"
+    ]
+  },
+  {
+    "customerId": "CUST1016",
+    "customerName": "Temple University",
+    "primaryAddress": "211 S Broad St, Philadelphia, PA",
+    "totalJobs": 3,
+    "activeJobs": 3,
+    "totalContractValue": 195668.0,
+    "workableBacklog": 17570.0,
+    "jobs": [
+      "NPA15928",
+      "NPA15938",
+      "NPA15945"
+    ]
+  },
+  {
+    "customerId": "CUST1017",
+    "customerName": "AC Convention Center",
+    "primaryAddress": "1 Convention Blvd, Atlantic City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 31500.0,
+    "workableBacklog": 31500.0,
+    "jobs": [
+      "NPA15929"
+    ]
+  },
+  {
+    "customerId": "CUST1018",
+    "customerName": "Janus R. Aguila",
+    "primaryAddress": "Z91315 Broad St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 15643.8,
+    "workableBacklog": 15643.8,
+    "jobs": [
+      "NPA15930"
+    ]
+  },
+  {
+    "customerId": "CUST1019",
+    "customerName": "Ahron Lieberman",
+    "primaryAddress": "Z73933 Walnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 8000.0,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15931"
+    ]
+  },
+  {
+    "customerId": "CUST1020",
+    "customerName": "Chris Miller",
+    "primaryAddress": "646303 Walnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 2350.0,
+    "workableBacklog": 2350.0,
+    "jobs": [
+      "NPA15932"
+    ]
+  },
+  {
+    "customerId": "CUST1021",
+    "customerName": "Stacey Teach",
+    "primaryAddress": "Z73933 Market St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 800.0,
+    "workableBacklog": 800.0,
+    "jobs": [
+      "NPA15933"
+    ]
+  },
+  {
+    "customerId": "CUST1022",
+    "customerName": "Mark Bergstrom",
+    "primaryAddress": "113652 Chestnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 169488.0,
+    "workableBacklog": 169488.0,
+    "jobs": [
+      "NPA15934"
+    ]
+  },
+  {
+    "customerId": "CUST1023",
+    "customerName": "Brianna Harrity",
+    "primaryAddress": "Z74659 Walnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 2350.0,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15935"
+    ]
+  },
+  {
+    "customerId": "CUST1024",
+    "customerName": "Market East Associates",
+    "primaryAddress": "800 Market St, Philadelphia, PA",
+    "totalJobs": 2,
+    "activeJobs": 2,
+    "totalContractValue": 44158.0,
+    "workableBacklog": 17570.0,
+    "jobs": [
+      "NPA15936",
+      "NPA15937"
+    ]
+  },
+  {
+    "customerId": "CUST1025",
+    "customerName": "City of Camden",
+    "primaryAddress": "520 Market St, Camden, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 124909.28,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15941"
+    ]
+  },
+  {
+    "customerId": "CUST1026",
+    "customerName": "Joseph Rossi",
+    "primaryAddress": "D96395 Walnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 8610.0,
+    "workableBacklog": 8610.0,
+    "jobs": [
+      "NPA15942"
+    ]
+  },
+  {
+    "customerId": "CUST1027",
+    "customerName": "Phil Rinaldi",
+    "primaryAddress": "920156 Market St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 10160.0,
+    "workableBacklog": 10160.0,
+    "jobs": [
+      "NPA15944"
+    ]
+  },
+  {
+    "customerId": "CUST1028",
+    "customerName": "Atlantic City Housing Authority",
+    "primaryAddress": "227 N Vermont Ave, Atlantic City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 76000.0,
+    "workableBacklog": 76000.0,
+    "jobs": [
+      "NPA15947"
+    ]
+  },
+  {
+    "customerId": "CUST1029",
+    "customerName": "Kevin Schulcz",
+    "primaryAddress": "D96395 Chestnut St, Philadelphia, PA",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 1861.8,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15948"
+    ]
+  },
+  {
+    "customerId": "CUST1030",
+    "customerName": "Camden County Office",
+    "primaryAddress": "520 Market St, Camden, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 17570.0,
+    "workableBacklog": 17570.0,
+    "jobs": [
+      "NPA15949"
+    ]
+  },
+  {
+    "customerId": "CUST1031",
+    "customerName": "Atlantic City Utilities",
+    "primaryAddress": "1300 Atlantic Ave, Atlantic City, NJ",
+    "totalJobs": 1,
+    "activeJobs": 1,
+    "totalContractValue": 124909.28,
+    "workableBacklog": 0.0,
+    "jobs": [
+      "NPA15950"
+    ]
+  }
+]
