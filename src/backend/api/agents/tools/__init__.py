@@ -27,7 +27,14 @@ from ..utils import (
 
 # Analysis tools
 from .analysis_tools import (
+    analyze_backlog,
     analyze_flights,
+)
+
+# Backlog filter tools
+from .backlog_filter_tools import (
+    filter_jobs,
+    reset_job_filters,
 )
 
 # Chart tools
@@ -73,8 +80,12 @@ __all__ = [
     # Filter tools
     "filter_flights",
     "reset_filters",
+    # Backlog filter tools
+    "filter_jobs",
+    "reset_job_filters",
     # Analysis tools
     "analyze_flights",
+    "analyze_backlog",
     # Chart tools
     "get_historical_payload",
     "get_predicted_payload",

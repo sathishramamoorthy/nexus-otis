@@ -410,3 +410,283 @@ def get_routes_sync() -> dict[str, Any]:
         response = client.get(f"{MCP_SERVER_URL}/api/routes", headers=headers)
         response.raise_for_status()
         return response.json()
+
+
+# ============================================================================
+# Backlog REST API Functions (Async)
+# ============================================================================
+
+
+async def get_backlog_jobs_from_mcp(
+    limit: int = 100,
+    offset: int = 0,
+    job_type: str | None = None,
+    ready_to_work: bool | None = None,
+    customer_name: str | None = None,
+    labor_type: str | None = None,
+    final_bill_month: str | None = None,
+    min_selling_amount: float | None = None,
+    max_selling_amount: float | None = None,
+    sort_by: str = "sellingAmount",
+    sort_desc: bool = True,
+) -> dict[str, Any]:
+    """Get backlog jobs from MCP server via HTTP."""
+    params: dict[str, Any] = {
+        "limit": limit,
+        "offset": offset,
+        "sort_by": sort_by,
+        "sort_desc": str(sort_desc).lower(),
+    }
+    if job_type:
+        params["job_type"] = job_type
+    if ready_to_work is not None:
+        params["ready_to_work"] = str(ready_to_work).lower()
+    if customer_name:
+        params["customer_name"] = customer_name
+    if labor_type:
+        params["labor_type"] = labor_type
+    if final_bill_month:
+        params["final_bill_month"] = final_bill_month
+    if min_selling_amount is not None:
+        params["min_selling_amount"] = min_selling_amount
+    if max_selling_amount is not None:
+        params["max_selling_amount"] = max_selling_amount
+
+    headers = await _get_auth_headers_async()
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.get(f"{MCP_SERVER_URL}/api/backlog", params=params, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_backlog_job_by_id_from_mcp(job_id: str) -> dict[str, Any]:
+    """Get a single backlog job from MCP server via HTTP."""
+    headers = await _get_auth_headers_async()
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.get(f"{MCP_SERVER_URL}/api/backlog/{job_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+async def update_backlog_job_status_from_mcp(
+    job_id: str,
+    down_payment_received: bool | None = None,
+    permit_received: bool | None = None,
+    material_ordered: bool | None = None,
+    material_on_hand: bool | None = None,
+    customer_delay: bool | None = None,
+) -> dict[str, Any]:
+    """Update a backlog job's status fields via MCP server HTTP.
+
+    Args:
+        job_id: The job ID to update
+        down_payment_received: Optional new value for down payment received
+        permit_received: Optional new value for permit received
+        material_ordered: Optional new value for material ordered
+        material_on_hand: Optional new value for material on hand
+        customer_delay: Optional new value for customer delay
+
+    Returns:
+        Dict with updated job data
+    """
+    headers = await _get_auth_headers_async()
+    headers["Content-Type"] = "application/json"
+
+    body: dict[str, Any] = {}
+    if down_payment_received is not None:
+        body["downPaymentReceived"] = down_payment_received
+    if permit_received is not None:
+        body["permitReceived"] = permit_received
+    if material_ordered is not None:
+        body["materialOrdered"] = material_ordered
+    if material_on_hand is not None:
+        body["materialOnHand"] = material_on_hand
+    if customer_delay is not None:
+        body["customerDelay"] = customer_delay
+
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.patch(
+            f"{MCP_SERVER_URL}/api/backlog/{job_id}",
+            json=body,
+            headers=headers,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_backlog_summary_from_mcp() -> dict[str, Any]:
+    """Get backlog summary from MCP server via HTTP."""
+    headers = await _get_auth_headers_async()
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.get(f"{MCP_SERVER_URL}/api/backlog-summary", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_backlog_customers_from_mcp() -> dict[str, Any]:
+    """Get backlog customers consolidated view from MCP server via HTTP."""
+    headers = await _get_auth_headers_async()
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.get(f"{MCP_SERVER_URL}/api/backlog-customers", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_backlog_utilization_from_mcp(
+    week_start: str | None = None,
+    week_end: str | None = None,
+) -> dict[str, Any]:
+    """Get backlog utilization data from MCP server via HTTP."""
+    params: dict[str, Any] = {}
+    if week_start:
+        params["week_start"] = week_start
+    if week_end:
+        params["week_end"] = week_end
+
+    headers = await _get_auth_headers_async()
+    async with httpx.AsyncClient(timeout=MCP_TIMEOUT) as client:
+        response = await client.get(
+            f"{MCP_SERVER_URL}/api/backlog-utilization", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_all_backlog_jobs_from_mcp() -> list[dict]:
+    """Convenience function to get all backlog jobs (up to 200)."""
+    result = await get_backlog_jobs_from_mcp(limit=200, offset=0)
+    return result.get("jobs", [])
+
+
+# ============================================================================
+# Backlog REST API Functions (Sync)
+# ============================================================================
+
+
+def get_backlog_jobs_sync(
+    limit: int = 100,
+    offset: int = 0,
+    job_type: str | None = None,
+    ready_to_work: bool | None = None,
+    customer_name: str | None = None,
+    labor_type: str | None = None,
+    final_bill_month: str | None = None,
+    min_selling_amount: float | None = None,
+    max_selling_amount: float | None = None,
+    sort_by: str = "sellingAmount",
+    sort_desc: bool = True,
+) -> dict[str, Any]:
+    """Sync version: Get backlog jobs from MCP server via HTTP."""
+    params: dict[str, Any] = {
+        "limit": limit,
+        "offset": offset,
+        "sort_by": sort_by,
+        "sort_desc": str(sort_desc).lower(),
+    }
+    if job_type:
+        params["job_type"] = job_type
+    if ready_to_work is not None:
+        params["ready_to_work"] = str(ready_to_work).lower()
+    if customer_name:
+        params["customer_name"] = customer_name
+    if labor_type:
+        params["labor_type"] = labor_type
+    if final_bill_month:
+        params["final_bill_month"] = final_bill_month
+    if min_selling_amount is not None:
+        params["min_selling_amount"] = min_selling_amount
+    if max_selling_amount is not None:
+        params["max_selling_amount"] = max_selling_amount
+
+    headers = _get_auth_headers()
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.get(f"{MCP_SERVER_URL}/api/backlog", params=params, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+def get_backlog_job_by_id_sync(job_id: str) -> dict[str, Any]:
+    """Sync version: Get a single backlog job."""
+    headers = _get_auth_headers()
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.get(f"{MCP_SERVER_URL}/api/backlog/{job_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+def update_backlog_job_status_sync(
+    job_id: str,
+    down_payment_received: bool | None = None,
+    permit_received: bool | None = None,
+    material_ordered: bool | None = None,
+    material_on_hand: bool | None = None,
+    customer_delay: bool | None = None,
+) -> dict[str, Any]:
+    """Sync version: Update a backlog job's status fields."""
+    headers = _get_auth_headers()
+    headers["Content-Type"] = "application/json"
+
+    body: dict[str, Any] = {}
+    if down_payment_received is not None:
+        body["downPaymentReceived"] = down_payment_received
+    if permit_received is not None:
+        body["permitReceived"] = permit_received
+    if material_ordered is not None:
+        body["materialOrdered"] = material_ordered
+    if material_on_hand is not None:
+        body["materialOnHand"] = material_on_hand
+    if customer_delay is not None:
+        body["customerDelay"] = customer_delay
+
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.patch(
+            f"{MCP_SERVER_URL}/api/backlog/{job_id}",
+            json=body,
+            headers=headers,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def get_backlog_summary_sync() -> dict[str, Any]:
+    """Sync version: Get backlog summary."""
+    headers = _get_auth_headers()
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.get(f"{MCP_SERVER_URL}/api/backlog-summary", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+def get_backlog_customers_sync() -> dict[str, Any]:
+    """Sync version: Get backlog customers consolidated view."""
+    headers = _get_auth_headers()
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.get(f"{MCP_SERVER_URL}/api/backlog-customers", headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+def get_backlog_utilization_sync(
+    week_start: str | None = None,
+    week_end: str | None = None,
+) -> dict[str, Any]:
+    """Sync version: Get backlog utilization data."""
+    params: dict[str, Any] = {}
+    if week_start:
+        params["week_start"] = week_start
+    if week_end:
+        params["week_end"] = week_end
+
+    headers = _get_auth_headers()
+    with httpx.Client(timeout=MCP_TIMEOUT) as client:
+        response = client.get(
+            f"{MCP_SERVER_URL}/api/backlog-utilization", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def get_all_backlog_jobs_sync() -> list[dict]:
+    """Sync version: Get all backlog jobs (up to 200)."""
+    result = get_backlog_jobs_sync(limit=200, offset=0)
+    return result.get("jobs", [])

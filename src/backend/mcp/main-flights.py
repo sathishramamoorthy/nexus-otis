@@ -11,7 +11,7 @@ Tools:
 Resources:
 - tables: Gets the list of all tables in the database.
 
-REST API Endpoints (Flights):
+REST API Endpoints:
 - GET /api/flights: Get flights with filtering and pagination
 - GET /api/flights/{id}: Get a specific flight by ID
 - GET /api/summary: Get flight data summary
@@ -19,21 +19,11 @@ REST API Endpoints (Flights):
 - GET /api/predictions: Get predicted payload data for future flights
 - GET /api/routes: Get list of available routes with statistics
 
-REST API Endpoints (Backlog):
-- GET /api/backlog: Get backlog jobs with filtering and pagination
-- GET /api/backlog/{job_id}: Get a specific job by ID
-- GET /api/backlog-summary: Get backlog data summary
-- GET /api/backlog-customers: Get customer consolidated view
-- GET /api/backlog-utilization: Get resource scheduling data
-
 DuckDB Tables:
 - flights: Current flight data
 - historical_data: Historical and predicted payload data (date, route, pounds, cubicFeet, predicted)
 - oneview: OneView integration data
 - utilization: Utilization tracking data
-- backlog: Job/project backlog data (jobId, customerName, sellingAmount, workableBacklogAmount, etc.)
-- backlog_oneview: Customer consolidated view (customerId, totalJobs, totalContractValue, workableBacklog)
-- backlog_utilization: Resource scheduling data (weekStartDate, crewScheduledHours, utilizationPercent)
 
 Transport: HTTP/SSE
 Default URL: http://localhost:8001
@@ -72,21 +62,11 @@ FLIGHTS_FILE = DATA_DIR / "flights.json"
 ONEVIEW_FILE = DATA_DIR / "oneview.json"
 UTILIZATION_FILE = DATA_DIR / "utilization.json"
 
-# Backlog data files
-BACKLOG_FILE = DATA_DIR / "backlog.json"
-BACKLOG_ONEVIEW_FILE = DATA_DIR / "backlogoneview.json"
-BACKLOG_UTILIZATION_FILE = DATA_DIR / "backlogutilization.json"
-
 # Historical data cache (loaded from flights.json)
 _HISTORICAL_DATA_CACHE: list = []
 
 # Cache for flight data (used by REST endpoints)
 _FLIGHT_DATA_CACHE: dict = {}
-
-# Cache for backlog data (used by REST endpoints)
-_BACKLOG_CACHE: list = []
-_BACKLOG_ONEVIEW_CACHE: list = []
-_BACKLOG_UTILIZATION_CACHE: list = []
 
 
 class LogisticsMCP:
@@ -157,48 +137,6 @@ class LogisticsMCP:
                 logger.info(f"Loaded {count[0] if count else 0} utilization records into DuckDB")
             except Exception as e:
                 logger.warning(f"Could not load utilization.json: {e}")
-
-        # Load backlog data (job/project backlog)
-        if BACKLOG_FILE.exists():
-            try:
-                self._duckdb_conn.execute(f"""
-                    CREATE TABLE backlog AS
-                    SELECT * FROM read_json_auto('{BACKLOG_FILE}')
-                """)
-                count = self._duckdb_conn.execute("SELECT COUNT(*) FROM backlog").fetchone()
-                logger.info(f"Loaded {count[0] if count else 0} backlog records into DuckDB")
-            except Exception as e:
-                logger.warning(f"Could not load backlog.json: {e}")
-
-        # Load backlog oneview data (customer consolidated view)
-        if BACKLOG_ONEVIEW_FILE.exists():
-            try:
-                self._duckdb_conn.execute(f"""
-                    CREATE TABLE backlog_oneview AS
-                    SELECT * FROM read_json_auto('{BACKLOG_ONEVIEW_FILE}')
-                """)
-                count = self._duckdb_conn.execute("SELECT COUNT(*) FROM backlog_oneview").fetchone()
-                logger.info(
-                    f"Loaded {count[0] if count else 0} backlog_oneview records into DuckDB"
-                )
-            except Exception as e:
-                logger.warning(f"Could not load backlogoneview.json: {e}")
-
-        # Load backlog utilization data (resource scheduling)
-        if BACKLOG_UTILIZATION_FILE.exists():
-            try:
-                self._duckdb_conn.execute(f"""
-                    CREATE TABLE backlog_utilization AS
-                    SELECT * FROM read_json_auto('{BACKLOG_UTILIZATION_FILE}')
-                """)
-                count = self._duckdb_conn.execute(
-                    "SELECT COUNT(*) FROM backlog_utilization"
-                ).fetchone()
-                logger.info(
-                    f"Loaded {count[0] if count else 0} backlog_utilization records into DuckDB"
-                )
-            except Exception as e:
-                logger.warning(f"Could not load backlogutilization.json: {e}")
 
         # Load historical data from flights.json (historicalData array)
         if FLIGHTS_FILE.exists():
@@ -602,267 +540,6 @@ def get_available_routes() -> dict[str, Any]:
 
 
 # ============================================================================
-# Backlog REST API Functions (for workable backlog data)
-# ============================================================================
-
-
-def _load_backlog_data() -> list:
-    """Load and cache backlog data from JSON files."""
-    global _BACKLOG_CACHE, _BACKLOG_ONEVIEW_CACHE, _BACKLOG_UTILIZATION_CACHE
-
-    if not _BACKLOG_CACHE and BACKLOG_FILE.exists():
-        logger.info(f"Loading backlog data from {BACKLOG_FILE}")
-        with open(BACKLOG_FILE, encoding="utf-8") as f:
-            _BACKLOG_CACHE = json.load(f)
-        logger.info(f"Loaded {len(_BACKLOG_CACHE)} backlog jobs")
-
-    if not _BACKLOG_ONEVIEW_CACHE and BACKLOG_ONEVIEW_FILE.exists():
-        logger.info(f"Loading backlog oneview data from {BACKLOG_ONEVIEW_FILE}")
-        with open(BACKLOG_ONEVIEW_FILE, encoding="utf-8") as f:
-            _BACKLOG_ONEVIEW_CACHE = json.load(f)
-        logger.info(f"Loaded {len(_BACKLOG_ONEVIEW_CACHE)} customer records")
-
-    if not _BACKLOG_UTILIZATION_CACHE and BACKLOG_UTILIZATION_FILE.exists():
-        logger.info(f"Loading backlog utilization data from {BACKLOG_UTILIZATION_FILE}")
-        with open(BACKLOG_UTILIZATION_FILE, encoding="utf-8") as f:
-            _BACKLOG_UTILIZATION_CACHE = json.load(f)
-        logger.info(f"Loaded {len(_BACKLOG_UTILIZATION_CACHE)} utilization records")
-
-    return _BACKLOG_CACHE
-
-
-def get_backlog_jobs(
-    limit: int = 100,
-    offset: int = 0,
-    job_type: str | None = None,
-    ready_to_work: bool | None = None,
-    customer_name: str | None = None,
-    labor_type: str | None = None,
-    final_bill_month: str | None = None,
-    min_selling_amount: float | None = None,
-    max_selling_amount: float | None = None,
-    sort_by: str = "sellingAmount",
-    sort_desc: bool = True,
-) -> dict[str, Any]:
-    """Get backlog jobs with filtering, sorting, and pagination."""
-    _load_backlog_data()
-    all_jobs = _BACKLOG_CACHE.copy()
-
-    # Apply filters
-    filtered = all_jobs
-
-    if job_type:
-        filtered = [j for j in filtered if j.get("jobType") == job_type]
-
-    if ready_to_work is not None:
-        filtered = [j for j in filtered if j.get("readyToWork") == ready_to_work]
-
-    if customer_name:
-        search = customer_name.lower()
-        filtered = [j for j in filtered if search in j.get("customerName", "").lower()]
-
-    if labor_type:
-        filtered = [j for j in filtered if j.get("laborType") == labor_type]
-
-    if final_bill_month:
-        filtered = [j for j in filtered if j.get("finalBillMonth") == final_bill_month]
-
-    if min_selling_amount is not None:
-        filtered = [j for j in filtered if j.get("sellingAmount", 0) >= min_selling_amount]
-
-    if max_selling_amount is not None:
-        filtered = [j for j in filtered if j.get("sellingAmount", 0) <= max_selling_amount]
-
-    # Sort
-    if sort_by and filtered:
-        filtered = sorted(
-            filtered,
-            key=lambda x: (
-                x.get(sort_by, 0)
-                if isinstance(x.get(sort_by), (int, float))
-                else str(x.get(sort_by, ""))
-            ),
-            reverse=sort_desc,
-        )
-
-    total = len(filtered)
-    paginated = filtered[offset : offset + limit]
-
-    return {
-        "jobs": paginated,
-        "total": total,
-        "query": {
-            "limit": limit,
-            "offset": offset,
-            "job_type": job_type,
-            "ready_to_work": ready_to_work,
-            "customer_name": customer_name,
-            "labor_type": labor_type,
-            "final_bill_month": final_bill_month,
-        },
-    }
-
-
-def get_backlog_job_by_id(job_id: str) -> dict[str, Any]:
-    """Get a specific backlog job by ID."""
-    _load_backlog_data()
-
-    for job in _BACKLOG_CACHE:
-        if job.get("jobId") == job_id:
-            return {"job": job}
-
-    return {"job": None, "error": f"Job {job_id} not found"}
-
-
-def update_backlog_job_status(
-    job_id: str,
-    down_payment_received: bool | None = None,
-    permit_received: bool | None = None,
-    material_ordered: bool | None = None,
-    material_on_hand: bool | None = None,
-    customer_delay: bool | None = None,
-) -> dict[str, Any]:
-    """Update status fields for a backlog job and recompute readyToWork."""
-    global _BACKLOG_CACHE
-    _load_backlog_data()
-
-    for job in _BACKLOG_CACHE:
-        if job.get("jobId") == job_id:
-            # Update only provided fields
-            if down_payment_received is not None:
-                job["downPaymentReceived"] = down_payment_received
-            if permit_received is not None:
-                job["permitReceived"] = permit_received
-            if material_ordered is not None:
-                job["materialOrdered"] = material_ordered
-            if material_on_hand is not None:
-                job["materialOnHand"] = material_on_hand
-            if customer_delay is not None:
-                job["customerDelay"] = customer_delay
-
-            # Recompute readyToWork based on conditions
-            # Ready if: payment received, permit received, material on hand, no customer delay
-            job["readyToWork"] = (
-                job.get("downPaymentReceived", False)
-                and job.get("permitReceived", False)
-                and job.get("materialOnHand", False)
-                and not job.get("customerDelay", False)
-            )
-
-            return {"job": job, "updated": True}
-
-    return {"job": None, "error": f"Job {job_id} not found", "updated": False}
-
-
-def get_backlog_summary() -> dict[str, Any]:
-    """Get a summary of all backlog data."""
-    _load_backlog_data()
-
-    total_selling = 0
-    total_workable = 0
-    total_projected_margin = 0
-    job_type_counts: dict[str, int] = {}
-    labor_type_counts: dict[str, int] = {}
-    month_counts: dict[str, float] = {}
-    ready_count = 0
-    not_ready_count = 0
-
-    for job in _BACKLOG_CACHE:
-        total_selling += job.get("sellingAmount", 0)
-        total_workable += job.get("workableBacklogAmount", 0)
-        total_projected_margin += job.get("projectedMargin", 0)
-
-        job_type = job.get("jobType", "Unknown")
-        job_type_counts[job_type] = job_type_counts.get(job_type, 0) + 1
-
-        labor = job.get("laborType", "Unknown")
-        labor_type_counts[labor] = labor_type_counts.get(labor, 0) + 1
-
-        month = job.get("finalBillMonth", "Unknown")
-        month_counts[month] = month_counts.get(month, 0) + job.get("sellingAmount", 0)
-
-        if job.get("readyToWork"):
-            ready_count += 1
-        else:
-            not_ready_count += 1
-
-    # Get unique customers
-    customers = set(job.get("customerName", "") for job in _BACKLOG_CACHE)
-    customers.discard("")
-
-    return {
-        "totalJobs": len(_BACKLOG_CACHE),
-        "totalSellingAmount": round(total_selling, 2),
-        "totalWorkableBacklog": round(total_workable, 2),
-        "totalProjectedMargin": round(total_projected_margin, 2),
-        "averageJobValue": round(total_selling / len(_BACKLOG_CACHE), 2) if _BACKLOG_CACHE else 0,
-        "jobTypeBreakdown": job_type_counts,
-        "laborTypeBreakdown": labor_type_counts,
-        "revenueByMonth": {k: round(v, 2) for k, v in sorted(month_counts.items())},
-        "readyToWork": ready_count,
-        "notReadyToWork": not_ready_count,
-        "uniqueCustomers": len(customers),
-    }
-
-
-def get_backlog_customers() -> dict[str, Any]:
-    """Get customer consolidated view from backlog oneview data."""
-    _load_backlog_data()
-
-    return {
-        "customers": _BACKLOG_ONEVIEW_CACHE,
-        "totalCustomers": len(_BACKLOG_ONEVIEW_CACHE),
-        "totalContractValue": sum(c.get("totalContractValue", 0) for c in _BACKLOG_ONEVIEW_CACHE),
-        "totalWorkableBacklog": sum(c.get("workableBacklog", 0) for c in _BACKLOG_ONEVIEW_CACHE),
-    }
-
-
-def get_backlog_utilization(
-    week_start: str | None = None,
-    week_end: str | None = None,
-) -> dict[str, Any]:
-    """Get resource utilization data for backlog scheduling."""
-    _load_backlog_data()
-
-    filtered = _BACKLOG_UTILIZATION_CACHE.copy()
-
-    if week_start:
-        filtered = [u for u in filtered if u.get("weekStartDate", "") >= week_start]
-
-    if week_end:
-        filtered = [u for u in filtered if u.get("weekEndDate", "") <= week_end]
-
-    # Calculate averages
-    if filtered:
-        avg_crew_util = sum(u.get("crewUtilizationPercent", 0) for u in filtered) / len(filtered)
-        avg_mechanic_util = sum(u.get("mechanicUtilizationPercent", 0) for u in filtered) / len(
-            filtered
-        )
-        avg_overall_util = sum(u.get("overallUtilizationPercent", 0) for u in filtered) / len(
-            filtered
-        )
-        total_scheduled_hours = sum(u.get("totalScheduledHours", 0) for u in filtered)
-    else:
-        avg_crew_util = 0
-        avg_mechanic_util = 0
-        avg_overall_util = 0
-        total_scheduled_hours = 0
-
-    return {
-        "utilization": filtered,
-        "totalWeeks": len(filtered),
-        "averageCrewUtilization": round(avg_crew_util, 1),
-        "averageMechanicUtilization": round(avg_mechanic_util, 1),
-        "averageOverallUtilization": round(avg_overall_util, 1),
-        "totalScheduledHours": total_scheduled_hours,
-        "query": {
-            "week_start": week_start,
-            "week_end": week_end,
-        },
-    }
-
-
-# ============================================================================
 # REST API Endpoints (Starlette)
 # ============================================================================
 
@@ -925,84 +602,6 @@ async def rest_get_summary(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# ============================================================================
-# Backlog REST API Endpoints (Starlette)
-# ============================================================================
-
-
-async def rest_get_backlog_jobs(request: Request) -> JSONResponse:
-    """REST endpoint for getting backlog jobs."""
-    params = request.query_params
-    result = get_backlog_jobs(
-        limit=int(params.get("limit", 100)),
-        offset=int(params.get("offset", 0)),
-        job_type=params.get("job_type"),
-        ready_to_work=params.get("ready_to_work", "").lower() == "true"
-        if params.get("ready_to_work")
-        else None,
-        customer_name=params.get("customer_name"),
-        labor_type=params.get("labor_type"),
-        final_bill_month=params.get("final_bill_month"),
-        min_selling_amount=float(min_sell)
-        if (min_sell := params.get("min_selling_amount"))
-        else None,
-        max_selling_amount=float(max_sell)
-        if (max_sell := params.get("max_selling_amount"))
-        else None,
-        sort_by=params.get("sort_by", "sellingAmount"),
-        sort_desc=params.get("sort_desc", "true").lower() == "true",
-    )
-    return JSONResponse(result)
-
-
-async def rest_get_backlog_job(request: Request) -> JSONResponse:
-    """REST endpoint for getting a single backlog job."""
-    job_id = request.path_params["job_id"]
-    result = get_backlog_job_by_id(job_id)
-    return JSONResponse(result)
-
-
-async def rest_patch_backlog_job(request: Request) -> JSONResponse:
-    """REST endpoint for updating a backlog job's status fields."""
-    job_id = request.path_params["job_id"]
-    body = await request.json()
-
-    result = update_backlog_job_status(
-        job_id=job_id,
-        down_payment_received=body.get("downPaymentReceived"),
-        permit_received=body.get("permitReceived"),
-        material_ordered=body.get("materialOrdered"),
-        material_on_hand=body.get("materialOnHand"),
-        customer_delay=body.get("customerDelay"),
-    )
-
-    if result.get("error"):
-        return JSONResponse(result, status_code=404)
-    return JSONResponse(result)
-
-
-async def rest_get_backlog_summary(request: Request) -> JSONResponse:
-    """REST endpoint for getting backlog summary."""
-    result = get_backlog_summary()
-    return JSONResponse(result)
-
-
-async def rest_get_backlog_customers(request: Request) -> JSONResponse:
-    """REST endpoint for getting backlog customer view."""
-    result = get_backlog_customers()
-    return JSONResponse(result)
-
-
-async def rest_get_backlog_utilization(request: Request) -> JSONResponse:
-    """REST endpoint for getting backlog utilization."""
-    params = request.query_params
-    result = get_backlog_utilization(
-        week_start=params.get("week_start"),
-        week_end=params.get("week_end"),
-    )
-    return JSONResponse(result)
-
-
 async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint."""
     data = _load_flight_data()
@@ -1013,9 +612,6 @@ async def health_check(request: Request) -> JSONResponse:
             "transport": "http/sse",
             "flights_loaded": len(data.get("flights", [])),
             "historical_records": len(_HISTORICAL_DATA_CACHE),
-            "backlog_jobs": len(_BACKLOG_CACHE),
-            "backlog_customers": len(_BACKLOG_ONEVIEW_CACHE),
-            "backlog_utilization_weeks": len(_BACKLOG_UTILIZATION_CACHE),
             "auth_enabled": is_auth_enabled(),
         }
     )
@@ -1026,20 +622,12 @@ rest_app = Starlette(
     debug=True,
     routes=[
         Route("/health", health_check, methods=["GET"]),
-        # Flight endpoints
         Route("/api/flights", rest_get_flights, methods=["GET"]),
         Route("/api/flights/{flight_id:str}", rest_get_flight, methods=["GET"]),
         Route("/api/summary", rest_get_summary, methods=["GET"]),
         Route("/api/historical", rest_get_historical, methods=["GET"]),
         Route("/api/predictions", rest_get_predictions, methods=["GET"]),
         Route("/api/routes", rest_get_routes, methods=["GET"]),
-        # Backlog endpoints
-        Route("/api/backlog", rest_get_backlog_jobs, methods=["GET"]),
-        Route("/api/backlog/{job_id:str}", rest_get_backlog_job, methods=["GET"]),
-        Route("/api/backlog/{job_id:str}", rest_patch_backlog_job, methods=["PATCH"]),
-        Route("/api/backlog-summary", rest_get_backlog_summary, methods=["GET"]),
-        Route("/api/backlog-customers", rest_get_backlog_customers, methods=["GET"]),
-        Route("/api/backlog-utilization", rest_get_backlog_utilization, methods=["GET"]),
     ],
 )
 
@@ -1056,12 +644,8 @@ if __name__ == "__main__":
 
     logger.info(f"Starting Logistics MCP Server on {MCP_HOST}:{MCP_PORT}")
     logger.info(f"REST API: http://{MCP_HOST}:{MCP_PORT}/api/flights")
-    logger.info(f"Backlog API: http://{MCP_HOST}:{MCP_PORT}/api/backlog")
 
     # Pre-load flight data
     _load_flight_data()
-
-    # Pre-load backlog data
-    _load_backlog_data()
 
     uvicorn.run(rest_app, host=MCP_HOST, port=MCP_PORT)

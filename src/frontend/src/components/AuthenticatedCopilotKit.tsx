@@ -28,6 +28,7 @@ async function createConversation(accessToken: string): Promise<string> {
 
 interface AuthenticatedCopilotKitProps {
   children: React.ReactNode;
+  agent?: "logistics_agent" | "backlog_agent";
 }
 
 /**
@@ -39,7 +40,7 @@ interface AuthenticatedCopilotKitProps {
  * the CopilotKit threadId. This enables AgentSession to manage server-side
  * conversation history natively via use_service_session=True.
  */
-export function AuthenticatedCopilotKit({ children }: AuthenticatedCopilotKitProps) {
+export function AuthenticatedCopilotKit({ children, agent = "logistics_agent" }: AuthenticatedCopilotKitProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [convError, setConvError] = useState<string | null>(null);
   const { accessToken, isLoading } = useAccessToken();
@@ -166,11 +167,11 @@ export function AuthenticatedCopilotKit({ children }: AuthenticatedCopilotKitPro
   };
 
   // Use Next.js API route as a proxy to the backend
-  // The proxy forwards requests to /logistics on the backend
+  // The proxy forwards requests to the appropriate agent endpoint
   return (
     <CopilotKit
       runtimeUrl="/api/copilotkit"
-      agent="logistics_agent"
+      agent={agent}
       headers={headers}
       threadId={threadId}
     >

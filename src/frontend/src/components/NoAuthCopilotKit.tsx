@@ -21,6 +21,7 @@ export function useNewChat(): (() => void) | null {
 
 interface NoAuthCopilotKitProps {
   children: React.ReactNode;
+  agent?: "logistics_agent" | "backlog_agent";
 }
 
 /**
@@ -48,7 +49,7 @@ async function createConversation(): Promise<string> {
  * the CopilotKit threadId. This enables AgentSession to manage server-side
  * conversation history natively via use_service_session=True.
  */
-export function NoAuthCopilotKit({ children }: NoAuthCopilotKitProps) {
+export function NoAuthCopilotKit({ children, agent = "logistics_agent" }: NoAuthCopilotKitProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,11 +106,11 @@ export function NoAuthCopilotKit({ children }: NoAuthCopilotKitProps) {
   }
 
   // Use Next.js API route as a proxy to the backend
-  // The proxy forwards requests to /logistics on the backend
+  // The proxy forwards requests to the appropriate agent endpoint
   return (
     <CopilotKit
       runtimeUrl="/api/copilotkit"
-      agent="logistics_agent"
+      agent={agent}
       threadId={threadId}
     >
       <NewChatContext.Provider value={handleNewChat}>
